@@ -26,9 +26,10 @@ export type Window = typeof(setmetatable({} :: {
     title: string,
     position: Vector2,
     size: Vector2,
-    components: { Toggle | Button | Label },
+    components: { Toggle | Button | Label }
+}, WindowMethods)) & {
     addComponent: <T>(self: Window, comp: T) -> T
-}, WindowMethods))
+}
 
 export type UI = {
     theme: Theme,
@@ -100,12 +101,12 @@ function SevereUI.new(theme: Theme): UI
                 title = title,
                 position = pos,
                 size = size,
-                components = {},
-                addComponent = function<T>(selfWin: Window, comp: T): T
-                    table.insert(selfWin.components, comp)
-                    return comp
-                end
+                components = {}
             }, WindowMethods)
+            win.addComponent = function<T>(selfWin: Window, comp: T): T
+                table.insert(selfWin.components, comp)
+                return comp
+            end
             table.insert(self.windows, win)
             return win
         end
@@ -119,19 +120,19 @@ function SevereUI.new(theme: Theme): UI
 end
 
 -- Window methods (now on WindowMethods table)
-function WindowMethods:toggle(self: Window, label: string, initial: boolean): Toggle
+function WindowMethods:toggle(label: string, initial: boolean): Toggle
     local tog: Toggle = { label = label, value = initial, position = vector.create(0, 0) }  -- Position set in render
     self:addComponent(tog)
     return tog
 end
 
-function WindowMethods:button(self: Window, label: string, onClick: () -> ()): Button
+function WindowMethods:button(label: string, onClick: () -> ()): Button
     local btn: Button = { label = label, onClick = onClick, position = vector.create(0, 0) }
     self:addComponent(btn)
     return btn
 end
 
-function WindowMethods:label(self: Window, text: string): Label
+function WindowMethods:label(text: string): Label
     local lbl: Label = { text = text, position = vector.create(0, 0) }
     self:addComponent(lbl)
     return lbl
