@@ -1,0 +1,135 @@
+-- SevereUI: A typed UI library based on Luau VM docs (drawing, vectors, typechecking)
+-- Export for module usage
+local SevereUI = {}
+
+-- Types (using doc's type system)
+export type Color3 = { r: number, g: number, b: number }  -- Simplified Color3
+export type Vector2 = { x: number, y: number }
+export type Theme = {
+    background: Color3,
+    accent: Color3,
+    text: Color3,
+    font: string,
+    fontSize: number
+}
+
+export type Toggle = { value: boolean, label: string, position: Vector2 }
+export type Button = { label: string, onClick: () -> (), position: Vector2 }
+export type Label = { text: string, position: Vector2 }
+
+export type Window = {
+    title: string,
+    position: Vector2,
+    size: Vector2,
+    components: { Toggle | Button | Label },
+    addComponent: <T>(self: Window, comp: T) -> T
+}
+
+export type UI = {
+    theme: Theme,
+    windows: { Window },
+    currentSelection: number,  -- For arrow key navigation
+    render: (self: UI) -> (),
+    window: (self: UI, title: string, pos: Vector2, size: Vector2) -> Window
+}
+
+-- Helper functions (using Luau syntax from docs)
+local function drawRect(pos: Vector2, size: Vector2, color: Color3, alpha: number?)
+    -- Simulate rect with filled circles/lines (doc doesn't have direct rect, so approximate)
+    local radius = math.min(size.x, size.y) / 10  -- Rounded corners
+    DrawingImmediate.FilledCircle(vector.create(pos.x, pos.y + radius), radius, color, alpha or 1, 20)  -- Top-left
+    DrawingImmediate.FilledCircle(vector.create(pos.x + size.x, pos.y + radius), radius, color, alpha or 1, 20)  -- Top-right
+    -- Add more for full rect (lines between, etc.) - omitted for brevity
+end
+
+local function drawText(pos: Vector2, text: string, color: Color3, size: number, font: string)
+    DrawingImmediate.OutlinedText(vector.create(pos.x, pos.y), size, color, 1, text, true, font)
+end
+
+-- UI constructor
+function SevereUI.new(theme: Theme): UI
+    local self: UI = {
+        theme = theme,
+        windows = {},
+        currentSelection = 1,
+        render = function(self: UI)
+            for _, win in self.windows do
+                -- Draw window background
+                drawRect(win.position, win.size, self.theme.background, 0.8)
+                -- Draw title
+                drawText(vector.create(win.position.x + 10, win.position.y + 5), win.title, self.theme.text, self.theme.fontSize, self.theme.font)
+                
+                local yOffset = 30  -- Start below title
+                local interactiveCount = 0
+                
+                for i, comp in win.components do
+                    local compPos = vector.create(win.position.x + 10, win.position.y + yOffset)
+                    if comp :: Toggle then  -- Type refinement
+                        -- Draw toggle as circle
+                        local circleColor = if comp.value then self.theme.accent else self.theme.background
+                        DrawingImmediate.FilledCircle(compPos, 10, circleColor, 1, 20)
+                        DrawingImmediate.Circle(compPos, 10, self.theme.text, 1, 20, 1)
+                        drawText(vector.create(compPos.x + 20, compPos.y - 5), comp.label .. ": " .. (if comp.value then "On" else "Off"), self.theme.text, self.theme.fontSize, self.theme.font)
+                        interactiveCount += 1
+                        if interactiveCount == self.currentSelection then
+                            -- Highlight selection
+                            DrawingImmediate.Circle(compPos, 12, self.theme.accent, 1, 20, 1)
+                        end
+                    elseif comp :: Button then
+                        -- Draw button as rounded rect
+                        drawRect(compPos, vector.create(100, 20), self.theme.accent, 0.9)
+                        drawText(vector.create(compPos.x + 10, compPos.y + 2), comp.label, self.theme.text, self.theme.fontSize, self.theme.font)
+                        interactiveCount += 1
+                        if interactiveCount == self.currentSelection then
+                            DrawingImmediate.Circle(vector.create(compPos.x + 50, compPos.y + 10), 15, self.theme.accent, 0.5, 20)
+                        end
+                    elseif comp :: Label then
+                        drawText(compPos, comp.text, self.theme.text, self.theme.fontSize, self.theme.font)
+                    end
+                    yOffset += 30
+                end
+            end
+        end,
+        window = function(self: UI, title: string, pos: Vector2, size: Vector2): Window
+            local win: Window = {
+                title = title,
+                position = pos,
+                size = size,
+                components = {},
+                addComponent = function<T>(selfWin: Window, comp: T): T
+                    table.insert(selfWin.components, comp)
+                    return comp
+                end
+            }
+            table.insert(self.windows, win)
+            return win
+        end
+    }
+    
+    -- Navigation (simulate arrow keys - integrate with input service)
+    -- Example: Up/down to change selection, enter to interact
+    -- Omitted full input handling for brevity; use memory reads or UserInputService
+    
+    return self
+end
+
+-- Window methods (using : syntax for self)
+function Window:toggle(label: string, initial: boolean): Toggle
+    local tog: Toggle = { label = label, value = initial, position = vector.create(0, 0) }  -- Position set in render
+    self:addComponent(tog)
+    return tog
+end
+
+function Window:button(label: string, onClick: () -> ()): Button
+    local btn: Button = { label = label, onClick = onClick, position = vector.create(0, 0) }
+    self:addComponent(btn)
+    return btn
+end
+
+function Window:label(text: string): Label
+    local lbl: Label = { text = text, position = vector.create(0, 0) }
+    self:addComponent(lbl)
+    return lbl
+end
+
+return SevereUI
